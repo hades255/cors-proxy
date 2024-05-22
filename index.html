@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-Time Weather Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin: 20px 0;
+        }
+        .weather-data {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            width: 100%;
+            max-width: 1200px;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .weather-card {
+            flex: 1 1 300px;
+            margin: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            background-color: #f9f9f9;
+        }
+        .weather-card h2 {
+            margin-top: 0;
+            font-size: 1.5em;
+            color: #007aff;
+        }
+        .weather-card p {
+            margin: 5px 0;
+            font-size: 1em;
+            color: #333;
+        }
+        .refresh-message {
+            text-align: center;
+            margin: 20px 0;
+            font-weight: bold;
+            color: #666;
+        }
+        .metric {
+            margin: 10px 0;
+            font-size: 1.2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        .arrow {
+            width: 10px;
+            height: 10px;
+        }
+        .up-arrow::after {
+            content: '▲';
+            color: #28a745;
+        }
+        .down-arrow::after {
+            content: '▼';
+            color: #dc3545;
+        }
+        .same-arrow::after {
+            content: '●';
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Weather Dashboard</h1>
+    <div id="refreshMessage" class="refresh-message"></div>
+    <div id="weatherData" class="weather-data"></div>
+
+    <script>
+        const apiUrl = 'http://www.bom.gov.au/fwo/IDV60901/IDV60901.95936.json';
+        const corsProxy = 'https://cors-anywhere.herokuapp.com/';
+        const pollingInterval = 15 * 60 * 1000; // 15 minutes
+
+        async function fetchWeatherData() {
+            try {
+                const response = await fetch(corsProxy + apiUrl);
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error('Error fetching weather data:', error);
+                return null;
+            }
+        }
+
+        function getIndicator(current, previous) {
+            if (current > previous) return 'up-arrow';
+            if (current < previous) return 'down-arrow';
+            return 'same-arrow';
+        }
+
+        function updateWeatherDashboard(data) {
+            const latestWeather = data.observations.data.find(entry => entry.sort_order === 0);
+            const previousWeather = data.observations.data.find(entry => entry.sort_order === 1);
+            const refreshMessageDiv = document.getElementById('refreshMessage');
+            refreshMessageDiv.innerHTML = `Refresh Message: ${data.observations.header[0].refresh_message}`;
+
+            const weatherDataDiv = document.getElementById('weatherData');
+            weatherDataDiv.innerHTML = ''; // Clear previous data
+
+            const metrics = [
+                { label: 'Temperature', key: 'air_temp', unit: '°C' },
+                { label: 'Apparent Temperature', key: 'apparent_t', unit: '°C' },
+                { label: 'Humidity', key: 'rel_hum', unit: '%' },
+                { label: 'Pressure', key: 'press', unit: 'hPa' },
+                { label: 'Wind Speed', key: 'wind_spd_kmh', unit: 'km/h' },
+                { label: 'Gust', key: 'gust_kmh', unit: 'km/h' },
+                { label: 'Rain Trace', key: 'rain_trace', unit: 'mm' },
+                { label: 'Visibility', key: 'vis_km', unit: 'km' },
+            ];
+
+            const weatherCard = document.createElement('div');
+            weatherCard.className = 'weather-card';
+            weatherCard.innerHTML = `
+                <h2>${latestWeather.name}</h2>
+                <p><strong>Local Date & Time:</strong> ${latestWeather.local_date_time}</p>
+            `;
+
+            metrics.forEach(metric => {
+                const currentValue = latestWeather[metric.key];
+                const previousValue = previousWeather[metric.key];
+                const indicatorClass = getIndicator(currentValue, previousValue);
+                weatherCard.innerHTML += `
+                    <div class="metric">
+                        <span>${metric.label}: ${currentValue} ${metric.unit}</span>
+                        <span class="arrow ${indicatorClass}"></span>
+                    </div>
+                `;
+            });
+
+            weatherDataDiv.appendChild(weatherCard);
+        }
+
+        async function refreshWeatherData() {
+            const data = await fetchWeatherData();
+            if (data) {
+                updateWeatherDashboard(data);
+            }
+        }
+
+        function init() {
+            refreshWeatherData();
+            setInterval(refreshWeatherData, pollingInterval);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
